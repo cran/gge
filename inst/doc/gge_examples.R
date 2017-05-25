@@ -10,16 +10,16 @@ dat1 <- yan.winterwheat
 
 library(gge)
 m1 <- gge(yield~gen*env, dat1, scale=FALSE)
-biplot(m1, title="yan.winterwheat - GGE biplot",
+biplot(m1, main="yan.winterwheat - GGE biplot",
        flip=c(1,0), origin=0, hull=TRUE)
 
 ## ---------------------------------------------------------------------------------------
 m2 <- gge(yield~gen*env, dat1, scale=TRUE)
-biplot(m2, title="yan.winterwheat - GGE biplot",
+biplot(m2, main="yan.winterwheat - GGE biplot",
        flip=c(1,1), origin=0)
 
 ## ---------------------------------------------------------------------------------------
-biplot(m2, title="yan.winterwheat - GGE biplot - PC 2 & 3",
+biplot(m2, main="yan.winterwheat - GGE biplot - PC 2 & 3",
        comps=c(2,3), flip=c(1,1), origin=0)
 
 ## ----mosaic-----------------------------------------------------------------------------

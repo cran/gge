@@ -1,5 +1,15 @@
 # gge.R
-# Time-stamp: <20 Sep 2016 11:04:36 c:/x/rpack/gge/R/gge.R>
+# Time-stamp: <24 May 2017 17:03:50 c:/x/rpack/gge/R/gge.R>
+
+#' GGE and GGB biplots
+#' 
+#' @name gge
+#' @aliases gge package-gge
+#' @author Kevin Wright, Jean-Louis Laffont
+#' @docType package
+#' @importFrom Rcpp evalCpp
+#' @useDynLib gge
+NULL
 
 # ----------------------------------------------------------------------------
 
@@ -34,14 +44,19 @@ RedGrayBlue <- colorRampPalette(c("firebrick", "lightgray", "#375997"))
 #' 
 #' The NIPALS algorithm can be used when there are missing data.
 #' 
-#' The argument 'method' can be either 'svd' for complete-data, or 'nipals' for
-#' missing-data.
+#' The argument 'method' can be one of
+#' (1) 'svd' for complete-data
+#' (2) 'nipals' for missing-data (coded in C++)
+#' (3) 'rnipals' for missing-data
 #' 
 #' @rdname gge
+#' 
 #' @param x A matrix or data.frame.
-#' @param ... Other arguments
+#' 
+#' @param ... Other arguments (e.g. maxiter)
+#' 
 #' @return A list of class \code{gge} containing:
-#' \item{method}{}
+#' \item{method}{Method used to calculate principal components.}
 #' \item{center}{Data centered?}
 #' \item{scale}{Data scaled?}
 #' \item{gen.group}{This is only used for plotting.  If not NULL, this specifies a
@@ -54,7 +69,9 @@ RedGrayBlue <- colorRampPalette(c("firebrick", "lightgray", "#375997"))
 #' of the vector contain the grouping information.  }
 #' @author
 #' Jean-Louis Laffont, Kevin Wright
+#' 
 #' @references
+#' 
 #' Jean-Louis Laffont, Kevin Wright and Mohamed Hanafi (2013).
 #' Genotype + Genotype x Block of Environments (GGB) Biplots.
 #' \emph{Crop Science}, 53, 2332-2341.
@@ -66,7 +83,8 @@ RedGrayBlue <- colorRampPalette(c("firebrick", "lightgray", "#375997"))
 #' Brisbane, Australia.
 #' \url{http://three-mode.leidenuniv.nl/document/biplot.pdf}
 #' 
-#' Yan, W. and Kang, M.S. (2003) \emph{GGE Biplot Analysis}.  CRC Press.
+#' Yan, W. and Kang, M.S. (2003).
+#' \emph{GGE Biplot Analysis}.  CRC Press.
 #' 
 #' @examples
 #' # Example 1.  Data is a data.frame in 'matrix' format
@@ -82,7 +100,8 @@ RedGrayBlue <- colorRampPalette(c("firebrick", "lightgray", "#375997"))
 #' 
 #' m1 = gge(B)
 #' plot(m1)
-#' biplot(m1, title="Example biplot")
+#' biplot(m1, main="Example biplot")
+#' # biplot3d(m1)
 #' 
 #' if(require(agridat)){
 #'   # crossa.wheat biplot
@@ -94,7 +113,8 @@ RedGrayBlue <- colorRampPalette(c("firebrick", "lightgray", "#375997"))
 #'                                c("KN","NB","PA","BJ","IL","TC", "JM","PI","AS","ID","SC","SS",
 #'                                  "SJ","MS","MG","MM")), "Grp1", "Grp2")
 #'   m2 <- gge(yield~gen*loc, dat2, env.group=eg, scale=FALSE)
-#'   biplot(m2, lab.env=TRUE, title="crossa.wheat")
+#'   biplot(m2, lab.env=TRUE, main="crossa.wheat")
+#'   # biplot3d(m2)
 #' }
 #' 
 #'
@@ -105,10 +125,15 @@ gge <- function(x, ...) UseMethod("gge")
 # ----------------------------------------------------------------------------
 
 #' @param formula A formula
+#' 
 #' @param data Data frame
+#' 
 #' @param gen.group genotype group
+#' 
 #' @param env.group env group
+#' 
 #' @rdname gge
+#' 
 #' @export
 gge.formula <- function(formula, data=NULL,
                         gen.group=NULL, env.group=NULL, ...) {
@@ -136,8 +161,7 @@ gge.formula <- function(formula, data=NULL,
       stop("The argument 'gen.group' refers to non-existant column of data.")
 
     if(any(colSums(table(data[[gen.group]], data[[.gen]])>0)>1)){
-      warning("Some values of '", .gen, "' have multiple gen.group.  Ignoring gen.group.")
-      gen.group <- NULL
+      stop("Some values of '", .gen, "' have multiple gen.group.")
     }
   }
   if(!is.null(env.group)) {
@@ -146,7 +170,7 @@ gge.formula <- function(formula, data=NULL,
       stop("The argument 'env.group' refers to non-existant column of data.")
 
     if(any(colSums(table(data[[env.group]], data[[.env]])>0)>1)){
-      warning("Some values of '", .env, "' have multiple env.group.  Ignoring env.group.")
+      stop("Some values of '", .env, "' have multiple env.group.")
       env.group <- NULL
     }
   }
@@ -154,7 +178,7 @@ gge.formula <- function(formula, data=NULL,
   # Finally, reshape data into a matrix, average values in each cell
   # require(reshape2) # Now in 'Depends'
   datm <- reshape2::acast(data, formula(paste(.gen, "~", .env)),
-                          fun.aggregate=mean, value.var=.y)
+                          fun.aggregate=mean, na.rm=TRUE, value.var=.y)
   datm[is.nan(datm)] <- NA # Use NA instead of NaN
 
   # Make gen.group and env.group to be vectors corresponding to rows/cols of datm
@@ -175,8 +199,11 @@ gge.formula <- function(formula, data=NULL,
 # ----------------------------------------------------------------------------
 
 #' @param center If TRUE, center values for each environment
+#' 
 #' @param scale If TRUE, scale values for each environment
+#' 
 #' @param method method used to find principal component directions
+#' 
 #' @rdname gge
 #' @export
 gge.matrix <- function(x, center=TRUE, scale=TRUE,
@@ -244,7 +271,7 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
 
   ##   x.svd <- NULL
   ##   pcascale <- ifelse(scale, 'uv', 'none') # Chg T/F to uv/none
-  ##   x.pca <- pca(x, nPcs=min(nrow(x), ncol(x)-1), completeObs=TRUE,
+  ##   x.pca <- pca(x, maxcomp=min(nrow(x), ncol(x)-1), completeObs=TRUE,
   ##                center=center, scale=pcascale, verbose=TRUE, method=method)
   ##   R2 <- x.pca@R2
   ##   x <- x.pca@completeObs # missing values are replaced with estimates
@@ -254,8 +281,8 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
 
   pcameth <- FALSE
 
-  if(!is.element(method, c('nipals', 'svd')))
-    stop("Unknown method.  Use 'svd' or 'nipals'")
+  if(!is.element(method, c('svd', 'nipals', 'rnipals')))
+    stop("Unknown method.  Use 'svd' or 'nipals' or 'rnipals'.")
 
   # Scale data
   x <- scale(x, center=center, scale=scale)  # Center / scale each environment
@@ -268,15 +295,22 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
 
   } else if(method=="nipals"){ # ----- Nipals
 
+    #oo <- nipals(x, center=FALSE, scale.=FALSE)
+    #nn <- nipalsPca(x, center=FALSE, scale.=FALSE)
+    
     x.svd <- NULL
-    x.pca <- nipals(x, completeObs=TRUE, center=FALSE, scale.=FALSE)
+    x.pca <- nipals(x, center=FALSE, scale.=FALSE, ...)
     R2 <- x.pca$R2
     x <- x.pca$completeObs # replaces missing values with estimates
     x <- scale(x, center=center, scale=scale)
 
+  } else if(method=="rnipals"){
+    x.svd <- NULL
+    x.pca <- rnipals(x, center=FALSE, scale.=FALSE, ...)
+    R2 <- x.pca$R2
+    x <- x.pca$completeObs # replaces missing values with estimates
+    x <- scale(x, center=center, scale=scale)    
   }
-
-  ## }
 
 	if(!is.null(x.svd) && length(x.svd$d) == 1)
 		stop("Only one principal component.  Biplot not available.")
@@ -313,8 +347,9 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
   #} else {
   if(method=="svd") {
     U <- x.svd$u
-  } else if (method=="nipals"){
-    U <- x.pca$x %*% diag(1/sqrt(x.pca$eval))
+  } else if (method=="nipals" | method=="rnipals"){
+    #browser()
+    U <- x.pca$scores %*% diag(1/sqrt(x.pca$eval))
   }
 
   # Partition SSG, SSGB, SSR along each axis
@@ -398,37 +433,41 @@ extend <- function(x,y,xlim,ylim){
 
 #' @rdname gge
 #' @export
-plot.gge <- function(x, title=substitute(x), ...) {
+plot.gge <- function(x, main=substitute(x), ...) {
 
-  # For now, only a mosaic plot.
+  # title deprecated in gge 1.2, 2017
+  args <- match.call()
+  if( is.element("title", names(args)) ) {
+    main <- args$title
+    cat("Argument 'title' will be deprecated. Use 'main' instead.\n")
+  }
+  
   # heatmap
 
-  op1 <- par(mfrow=c(2,2))
+  op1 <- par(mfrow=c(2,2), pty="s", mar=c(3,5,2,1))
   R2 <- x$R2
 
   # Scree plot
-  op2 <- par(pty='s', mar=c(3,5,2,1))
+  #op2 <- par(pty='s', mar=c(3,5,2,1))
   plot(1:length(R2), R2, type="b", axes=FALSE,
        main="", xlab="", ylab="Scree plot - Pct SS")
   axis(1, at=pretty(1:length(R2)), cex.axis=0.75)
   axis(2, at=pretty(c(0,max(R2))), cex.axis=0.75)
 
   # Mosaic
-  par(pty='s', mar=c(2,1,2,1))
+  par(mar=c(3,2,2,1))
   mosaicplot(x$mosdat, main="",
              col=c("darkgreen","lightgreen","gray70"), off=c(0,0))
-  mtext(title, line=.5, cex=1)
+  mtext(main, line=.5, cex=1)
 
   # Heatmap
   Y <- x$x
-  #par(pty = "m", mar = c(2, 3, 3, 1))
   image(t(Y), col=RedGrayBlue(12), axes=FALSE)
   axis(2, seq(from=0, to=1, length=nrow(Y)), labels=rownames(Y),
        tick=FALSE, cex.axis=.4, col.axis="black", las=2, line=-.8)
   axis(3, seq(from=0, to=1, length=ncol(Y)), labels=colnames(Y),
        tick=FALSE, cex.axis=.4, col.axis="black", las=2, line=-0.8)
 
-  par(op2)
   par(op1)
 
   invisible()
@@ -436,33 +475,54 @@ plot.gge <- function(x, title=substitute(x), ...) {
 
 # ----------------------------------------------------------------------------
 
-#' @param title title
-#' @param subtitle subtitle
-#' @param cex.gen character expansion for genotypes
-#' @param cex.env character expansion for environments
-#' @param col.gen color for genotypes
-#' @param col.env color for envts
-#' @param pch.gen plot character for genotypes
-#' @param lab.env label envts
-#' @param comps comps
+#' @param main Title, by default the name of the data. Use NULL to suppress the title.
+#' 
+#' @param subtitle Subtitle to put in front of options. Use NULL to suppress the subtitle.
+#'
+#' @param xlab Label along axis. Default "auto" shows percent of variation explained. Use NULL to suppress.
+#'
+#' @param ylab Label along axis. Default "auto" shows percent of variation explained. Use NULL to suppress.
+#' 
+#' @param cex.gen Character expansion for genotypes
+#' 
+#' @param cex.env Character expansion for environments
+#' 
+#' @param col.gen Color for genotypes
+#' 
+#' @param col.env Color for environments
+#' 
+#' @param pch.gen Plot character for genotypes
+#' 
+#' @param lab.env Label environments if TRUE.
+#' 
+#' @param comps Principal components to use for the biplot. Default c(1,2).
+#' 
 #' @param flip If "auto" then each axis is flipped so that the genotype
 #' ordinate is positively correlated with genotype means.  Can also be a vector
 #' like c(TRUE,FALSE) for manual control.
+#' 
 #' @param origin If "auto", the plotting window is centered on genotypes, otherwise
 #' the origin is at the middle of the window.
+#' 
 #' @param res.vec If TRUE, for each group, draw residual vectors from the mean
-#' of the locs to the individual locs
-#' @param hull If TRUE, show which-won-where polygon
+#' of the locs to the individual locs.
+#' 
+#' @param hull If TRUE, show a which-won-where polygon.
+#' 
 #' @param zoom.gen Zoom factor for manual control of genotype xlim,ylim
 #' The default is 1. Values less than 1 may be useful if genotype names are long.
+#' 
 #' @param zoom.env Zoom factor for manual control of environment xlim,ylim.
 #' The default is 1. Values less than 1 may be useful if environment names are long.
+#' Not used for 3D biplots.
+#' 
 #' @rdname gge
 #' @import graphics
 #' @import grDevices
 #' @import stats
 #' @export
-biplot.gge <- function(x, title = substitute(x), subtitle="",
+biplot.gge <- function(x, main = substitute(x), subtitle="",
+                       xlab="auto", ylab="auto",
                        cex.gen=0.6, cex.env=.5,
                        col.gen="darkgreen", col.env="orange3",
                        pch.gen=1,
@@ -475,6 +535,13 @@ biplot.gge <- function(x, title = substitute(x), subtitle="",
                        zoom.gen=1, zoom.env=1,
                        ...){
 
+  # title deprecated in gge 1.2, 2017
+  args <- match.call()
+  if( is.element("title", names(args)) ) {
+    main <- args$title
+    cat("Argument 'title' will be deprecated. Use 'main' instead.\n")
+  }
+    
   # x: A model object of class 'gge'
   # Must include ... because the generic 'biplot' does
 
@@ -492,11 +559,15 @@ biplot.gge <- function(x, title = substitute(x), subtitle="",
   n.env.grp <- length(unique(env.group))
 
   # Add options to subtitle
-  if(subtitle != "") subtitle <- paste0(subtitle, ", ")
-  subtitle <- paste0(subtitle, "method=", x$method)
-  subtitle <- paste0(subtitle, ", center=", x$center)
-  subtitle <- paste0(subtitle, ", scale=", x$scale)
-  subtitle <- paste0(subtitle, ", missing: ", round(pctMiss*100,1), "%")
+  if(is.null(subtitle)) {
+    subtitle = ""
+  } else {
+    if(subtitle != "") subtitle <- paste0(subtitle, ", ")
+    subtitle <- paste0(subtitle, "method=", x$method)
+    subtitle <- paste0(subtitle, ", center=", x$center)
+    subtitle <- paste0(subtitle, ", scale=", x$scale)
+    subtitle <- paste0(subtitle, ", missing: ", round(pctMiss*100,1), "%")
+  }
 
   # Environment (group) colors (first one is used for environments)
   # Replicate colors if not enough have been specified
@@ -506,16 +577,6 @@ biplot.gge <- function(x, title = substitute(x), subtitle="",
     col.env <- col.env[1]
   } else {
     col.env <- rep(col.env, length=n.env.grp)
-  }
-
-  # If alpha transparency is supported, use 70%=180
-  if(.Device != "windows") {
-    col.env <- col2rgb(col.env)
-    col.env <- rgb(col.env[1,], col.env[2,], col.env[3,],
-                   alpha=180, maxColorValue=255)
-    col.gen <- col2rgb(col.gen)
-    col.gen <- rgb(col.gen[1,], col.gen[2,], col.gen[3,],
-                   alpha=180, maxColorValue=255)
   }
 
   # Flip. If 'auto', flip the axis so that genotype ordinate is positively
@@ -530,17 +591,33 @@ biplot.gge <- function(x, title = substitute(x), subtitle="",
     }
   }
 
-  # Set up plot
-  par(pty='s')
+  # Initialize plot
+  op1 <- par(pty="s")
 
+  # If alpha transparency is supported, use 70%=180
+  if(.Device=="windows" | .Device=="RStudioGD") {
+    # These devices do not support true transparency
+  } else {
+    col.env <- col2rgb(col.env)
+    col.env <- rgb(col.env[1,], col.env[2,], col.env[3,],
+                   alpha=180, maxColorValue=255)
+    col.gen <- col2rgb(col.gen)
+    col.gen <- rgb(col.gen[1,], col.gen[2,], col.gen[3,],
+                   alpha=180, maxColorValue=255)
+  }
+  
   xcomp <- comps[1] # Component for x axis
   ycomp <- comps[2] # Component for y axis
 
   # Axis labels
   labs <- paste("PC ", c(xcomp, ycomp),
-                  " (", round(100*R2[c(xcomp,ycomp)],0), "% TSS)", sep="")
-  xlab <- labs[1]
-  ylab <- labs[2]
+                " (", round(100*R2[c(xcomp,ycomp)],0), "% TSS)", sep="")
+  if(!is.null(xlab)) {
+    if(xlab=="auto") xlab <- labs[1]
+  }
+  if(!is.null(ylab)) {
+    if(ylab=="auto") ylab <- labs[2]
+  }
 
   expand.range <- function(xx) { # Make sure range includes origin
     if(xx[1] > 0) xx[1] <-  - xx[1]
@@ -584,7 +661,7 @@ biplot.gge <- function(x, title = substitute(x), subtitle="",
   # Add the margin axis labels and titles
   mtext(xlab, side=1, line=.5, cex=.8)
   mtext(ylab, side=2, line=.5, cex=.8)
-  mtext(title, side=3, line=2.5)
+  mtext(main, side=3, line=2.5)
   mtext(subtitle, side=3, line=0.9, cex=.7)
 
   # Note that each environment vector has length 1:
@@ -610,8 +687,10 @@ biplot.gge <- function(x, title = substitute(x), subtitle="",
   if(lab.env == TRUE) {
     text(locCoord[ , c(xcomp, ycomp), drop = FALSE],
          rownames(locCoord), cex=cex.env, col = col.env[eix])
-  } else points(locCoord[ , c(xcomp, ycomp), drop = FALSE],
-                cex = cex.env, col = col.env[eix]) # pch = (1:n.env.grp)[eix])
+  } else {
+    points(locCoord[ , c(xcomp, ycomp), drop = FALSE],
+           cex = cex.env, col = col.env[eix]) # pch = (1:n.env.grp)[eix])
+  }
 
   # Draw vectors.  Shorten by 5% to reduce over-plotting the label
   if(n.env.grp < 2){
@@ -636,7 +715,7 @@ biplot.gge <- function(x, title = substitute(x), subtitle="",
     # to reduce over-plotting.
     segments(ubc[ , xcomp], ubc[ , ycomp],
              .90*xy[,1], .90*xy[,2], lty = 3, col=col.env)
-    # Group label
+    # Add group label
     text(.95*xy[,1], .95*xy[,2], rownames(ubc), cex = 1, col=col.env)
   }
 
@@ -656,6 +735,7 @@ biplot.gge <- function(x, title = substitute(x), subtitle="",
   ylimg = ylimg / zoom.gen
   plot(NULL, type = "n", xaxt="n", yaxt="n", xlab="", ylab="",
        xlim=xlimg, ylim=ylimg)
+  
   # Now overlay genotype labels and/or points
   if(n.gen.grp < 2) {
     text(genCoord[, c(xcomp, ycomp)], rownames(genCoord), cex=cex.gen, col=col.gen)
@@ -692,15 +772,293 @@ biplot.gge <- function(x, title = substitute(x), subtitle="",
       segments(0, 0, 1.1*xy[,1], 1.1*xy[,2], lty = 2, col="gray60")
     }
   }
+
+  par(op1)
   
   invisible()
 }
 
 # ----------------------------------------------------------------------------
 
+#' @rdname gge
+#' @export
+biplot3d <- function(x, ...) UseMethod("biplot3d", x)
+
+#' @rdname gge
+#' @method biplot3d gge
+#' @import rgl
+#' @export
+biplot3d.gge <- function(x,
+                         cex.gen=0.6, cex.env=.5,
+                         col.gen="darkgreen", col.env="orange3",
+                         comps=1:3,
+                         lab.env=TRUE,
+                         res.vec=TRUE,
+                         zoom.gen=1,
+                         ...){
+  # title/subtitle are not used
+  gen.group <- x$gen.group
+  env.group <- x$env.group
+  genCoord <- x$genCoord
+  locCoord <- x$locCoord
+  blockCoord <- x$blockCoord
+  R2 <- x$R2
+
+  if(is.null(env.group)) n.env.grp <- 0
+  else n.env.grp <- length(unique(env.group))
+
+  if(length(R2) == 2)
+    stop("Only two principal components--3D biplot not available.")
+  if(length(comps) < 3)
+    stop("You need to specify 3 components for 3D biplot.")
+
+  # Environment (group) colors (first one is used for environments)
+  # Replicate colors if not enough have been specified
+  col.env <- c(col.env, "blue","black","purple","darkgreen", "red",
+               "dark orange", "deep pink", "#999999", "#a6761d")
+  if(n.env.grp < 2) {
+    col.env <- col.env[1]
+  } else {
+    col.env <- rep(col.env, length=n.env.grp)
+  }
+
+  # Set up device
+  open3d()
+  bg3d(color="white")
+
+  xcomp <- comps[1] # Component for x axis
+  ycomp <- comps[2] # Component for y axis
+  zcomp <- comps[3] # Component for z axis
+
+  # Axis labels
+  labs <- paste("PC ", c(xcomp, ycomp, zcomp),
+                  " (", round(100*R2[c(xcomp,ycomp)],0), "% TSS)", sep="")
+  xlab <- labs[1]
+  ylab <- labs[2]
+  zlab <- labs[3]
+
+  expand.range <- function(xx) { # Make sure range includes origin
+    if(xx[1] > 0) xx[1] <-  - xx[1]
+    else if(xx[2] < 0) xx[2] <-  - xx[2]
+    return(xx)
+  }
+
+  # Determine the range for locs (use same range for all axes)
+  envRange <- expand.range(range(locCoord[, c(xcomp,ycomp,zcomp)]))
+  xlim <- ylim <- zlim <- range(envRange) * 1.05 # Add 5% for extra space
+
+  # Plot locs first (points OR labels, but not both) colored by group
+  if(is.null(env.group)) {
+    eix <- rep(1, nrow(locCoord))
+  } else eix <- as.numeric(factor(env.group))
+
+  if(lab.env==TRUE){
+    text3d(locCoord[,xcomp], locCoord[,ycomp], locCoord[,zcomp],
+           texts=rownames(locCoord),
+           cex=cex.env, col=col.env[eix], alpha=0.7)
+  } else {
+    spheres3d(locCoord[,xcomp], locCoord[,ycomp], locCoord[,zcomp],
+              radius=0.01*diff(xlim), col=col.env[eix], alpha=0.5)
+  }
+
+  # Plot the environments (points OR labels, but not both).
+  if(n.env.grp == 0) { # use the same color for all locs
+  } else { # color loc by group.
+    ##   # Very faint group labels
+    ##   text3d(locCoord[,xcomp], locCoord[,ycomp], locCoord[,zcomp],
+    ##          texts=rownames(locCoord),
+    ##          col=col.env[env.group], alpha=.1)
+  }
+
+  # Bounding box
+  col.axis <- 'black'
+
+  # Draw axes and label
+  lines3d(xlim, rep(ylim[1],2), rep(zlim[1], 2),  col=col.axis, alpha=0.5)
+  text3d(xlim[2], ylim[1], zlim[1],
+         texts=xlab, cex=cex.env, col=col.axis, alpha=0.5)
+  lines3d(rep(xlim[1],2), ylim, rep(zlim[1], 2), col=col.axis, alpha=0.5)
+  text3d(xlim[1], ylim[2], zlim[1],
+         texts=ylab, cex=cex.env, col=col.axis, alpha=0.5)
+  lines3d(rep(xlim[1],2), rep(ylim[1],2), zlim, col=col.axis, alpha=0.5)
+  text3d(xlim[1], ylim[1], zlim[2],
+         texts=zlab, cex=cex.env, col=col.axis, alpha=0.5)
+
+  # Add vectors (and group labels, if needed)
+  if(n.env.grp < 2) {
+    # Draw vector to each loc
+    apply(cbind(locCoord[,c(xcomp, ycomp, zcomp)], col.env[1]), 1,
+          function(xx) {
+            segments3d(c(0, xx[1]), c(0, xx[2]), c(0, xx[3]),
+                       col=xx[4], alpha=0.5) })
+  } else {
+    # Short residual vectors from group mean to each loc
+    if(res.vec) {
+      apply(cbind(blockCoord[ , c(xcomp,ycomp,zcomp)], locCoord[ , c(xcomp,ycomp,zcomp)], col.env[eix]), 1,
+            function(xx) {
+              segments3d(c(xx[1], xx[4]), c(xx[2], xx[5]), c(xx[3], xx[6]),
+                         col = xx[7], alpha=0.5) })
+    }
+
+    # Draw solid-line part of the group vector
+    apply(cbind(blockCoord[,c(xcomp, ycomp, zcomp)], col.env[eix]), 1,
+          function(xx) {
+            segments3d(c(0, xx[1]), c(0, xx[2]), c(0, xx[3]),
+                       col=xx[4], alpha=0.5, lwd=4) })
+    
+    # Origin is a black dot
+    spheres3d(0,0,0, 
+              radius=0.01*diff(xlim),
+              col="black", alpha=0.5)
+    
+    # Add group label
+    text3d(blockCoord[, xcomp], blockCoord[, ycomp], blockCoord[, zcomp],
+           texts=rownames(blockCoord),
+           cex=cex.env*1.5, col=col.env[eix], alpha=0.9)
+  }
+
+  # Overlay the genotype names (re-scale to fill the graph)
+  genRange <- expand.range(range(genCoord[, c(xcomp,ycomp,zcomp)]))
+  ratio <- min(xlim/genRange) * zoom.gen # Why only xlim?
+  text3d(genCoord[,xcomp]*ratio, genCoord[,ycomp]*ratio, genCoord[,zcomp]*ratio,
+         texts=rownames(genCoord),
+         cex=cex.gen, color=col.gen, alpha=0.5)
+
+  return()
+}
+
+# ----------------------------------------------------------------------------
+
+#' PCA by non-linear iterative partial least squares in C++
+#'
+#' Used for finding principal components of a numeric matrix.  Components
+#' are extracted one a time.  Missing values in the matrix are allowed.
+#'
+#' @param x Numerical matrix
+#' 
+#' @param maxcomp Maximum number of principal components to extract.
+#'
+#' @param maxiter Maximum number of NIPALS iterations to perform.
+#'
+#' @param propvar The proportion of variance that should be explained by the
+#' returned principal components. If propvar < 1, then \code{maxcomp} is ignored.
+#'
+#' @param tol Default 1e-6 tolerance for testing convergence of the algorithm.
+#'
+#' @param center If TRUE, do center columns.
+#'
+#' @param scale. If FALSE, do not scale columns.
+#'
+#' @param ... Only used for passing through arguments.
+#' 
+#' @return A list with components.
+#' 
+#' @references
+#' Wold, H. (1966) Estimation of principal components and
+#' related models by iterative least squares. In Multivariate
+#' Analysis (Ed., P.R. Krishnaiah), Academic Press, NY, 391-420.
+#' 
+#' @author Henning Redestig
+#' 
+#' @export
 nipals <- function(x, maxcomp=min(nrow(x), ncol(x)-1),
-                    completeObs=TRUE,
-                    maxiter=50*nrow(x),
+                   maxiter=5000,
+                   tol=1e-6, propvar=1,  
+                   center=TRUE, scale.=FALSE, ...) {
+  
+  x <- as.matrix(x)
+  x.orig <- x # Save x for replacing missing values
+  
+  x <- scale(x, center=center, scale=scale.)
+  cen <- attr(x, "scaled:center")
+  sc <- attr(x, "scaled:scale")
+  if (any(sc == 0))
+    stop("cannot rescale a constant/zero column to unit variance")
+  
+  # Check for a column/row with all NAs
+  col.count <- apply(x, 2, function(x) sum(!is.na(x)))
+  if(any(col.count==0)) warning("At least one column is all NAs")
+  row.count <- apply(x, 1, function(x) sum(!is.na(x)))
+  if(any(row.count==0)) warning("At least one row is all NAs")
+  
+  # danger! scale() adds additional attributes to 'x' which confuses the C code
+  # and over-writes some memory. Remove these attributes before handing to C
+  mat=x
+  attr(mat, "scaled:center") <- NULL
+  attr(mat, "scaled:scale") <- NULL
+  nipRes <- .Call("gge_Nipals", mat,
+                  params=list(maxcomp=maxcomp,
+                              propvar=propvar,
+                              tol=tol,
+                              maxiter=maxiter),
+                  PACKAGE="gge")
+  
+  scores <- nipRes$scores
+  loadings <- nipRes$loadings
+  R2cum <- nipRes$R2cum
+  
+  # un-cumulate R2
+  R2 <- c(R2cum[1], diff(R2cum))
+  
+  # eigen values
+  eval = apply(scores, 2, function(x) sum(x*x))
+  
+  # re-construction of x using maxcomp principal components
+  fitted.values <- scores[ , 1:maxcomp] %*% t(loadings[ , 1:maxcomp])
+  if(scale.) fitted.values <- fitted.values * attr(x, "scaled:scale")
+  if(center) fitted.values <- fitted.values + attr(x, "scaled:center")
+  
+  # replace missing values in the original matrix with fitted values
+  completeObs <- x.orig
+  completeObs[is.na(x.orig)] <- fitted.values[is.na(x.orig)]
+  
+  # prepare output
+  rownames(scores) <- rownames(x)
+  colnames(scores) <- paste("PC", 1:ncol(scores), sep="")
+  rownames(loadings) <- colnames(x)
+  colnames(loadings) <- paste("PC", 1:ncol(loadings), sep="")
+  out <- list(scores = scores, rotation = loadings,
+              completeObs = completeObs,
+              maxcomp = maxcomp,
+              center=if(is.null(cen)) FALSE else cen,
+              scale=if(is.null(sc)) FALSE else sc,
+              sdev=apply(scores, 2, sd), # needed for prcomp print method
+              R2 = R2,
+              eval=eval,
+              propvar = propvar)
+  class(out) <- c("nipals","prcomp")
+  return(out)
+}
+
+# ----------------------------------------------------------------------------
+
+
+#' PCA by non-linear iterative partial least squares, coded in R.
+#' 
+#' @param x Numerical matrix
+#' 
+#' @param maxcomp Maximum number of principal components to extract.
+#'
+#' @param maxiter Maximum number of NIPALS iterations to perform.
+#'
+#' @param propvar The proportion of variance that should be explained by the
+#' returned principal components. If propvar < 1, then \code{maxcomp} is ignored.
+#'
+#' @param tol Default 1e-6 tolerance for testing convergence of the algorithm.
+#'
+#' @param center If TRUE, do center columns.
+#'
+#' @param scale. If FALSE, do not scale columns.
+#'
+#' @param verbose FALSE. If TRUE, show diagnostic output.
+#'
+#' @return A list with components.
+#'
+#' @author Kevin Wright
+#' 
+#' @export
+rnipals <- function(x, maxcomp=min(nrow(x), ncol(x)-1),
+                    maxiter=5000,
                     tol=1e-6, propvar=1,
                     center=TRUE, scale.=FALSE, verbose=FALSE) {
   # Calculate principal components using NIPALS
@@ -720,9 +1078,6 @@ nipals <- function(x, maxcomp=min(nrow(x), ncol(x)-1),
   if (any(sc == 0))
     stop("cannot rescale a constant/zero column to unit variance")
 
-  nr <- nrow(x)
-  nc <- ncol(x)
-
   # sum(NA, na.rm=TRUE) is 0, but we want NA
   sum.na <- function(x){ ifelse(all(is.na(x)), NA, sum(x, na.rm=TRUE))}
 
@@ -737,14 +1092,8 @@ nipals <- function(x, maxcomp=min(nrow(x), ncol(x)-1),
   # Find a starting column (with fewest number of NAs)
   # startingColumn <- which.max(col.count)
   startingColumn <- ncol(x)
-  # Choose the column with maximum variation.
-  # Maybe we should do this inside the loop for each PC
-  #startingColumn <-
-  #  which.max(apply(x, 2, function(z) {
-  #    z <- na.omit(z)
-  #    ifelse(length(z)==1, NA, var(z))
-  #  }))
-  if(verbose >= 2) cat("Starting column: ", startingColumn, "\n")
+
+  if(verbose >= 1) cat("Starting column: ", startingColumn, "\n")
 
   TotalSS <- sum(x*x, na.rm=TRUE)
 
@@ -756,7 +1105,7 @@ nipals <- function(x, maxcomp=min(nrow(x), ncol(x)-1),
     iter <- 0
     u <- x[,startingColumn]
     continue <- TRUE
-    if(verbose >= 1) cat(paste("\nCalculating PC", comp, ": ", sep=""))
+    if(verbose >= 1) cat(paste("Calculating PC", comp, sep=""))
 
     while(continue) {
       iter <- iter+1
@@ -776,21 +1125,15 @@ nipals <- function(x, maxcomp=min(nrow(x), ncol(x)-1),
       if (iter > maxiter) stop("Exceeding ", maxiter, " iterations, quitting")
       if( sum((u.old-u)^2, na.rm=TRUE)<tol ) continue=FALSE
 
-      if (verbose >= 1) cat("*")
+      if (verbose >= 1) cat(".")
     }
-    if (verbose >= 1) cat(" Done\n")
-
+    if (verbose >= 1) cat("\n")
+    
     # Remove the estimated principal component from x, x-uv'
     x <- x - (u %*% t(v))
     scores <- cbind(scores, u)
     loadings <- cbind(loadings, v)
     eval <- c(eval, sum(u*u))
-    if(verbose >= 2) {
-      cat("scores\n")
-      print(u[1:5,])
-      cat("loadings\n")
-      print(v[1:5,])
-    }
 
     # Cumulative proportion of variance
     R2cum <- c(R2cum, 1 - (sum(x*x,na.rm=TRUE) / TotalSS))
@@ -799,40 +1142,40 @@ nipals <- function(x, maxcomp=min(nrow(x), ncol(x)-1),
     else if(R2cum[comp] >= propvar) {
       # Maybe I should set maxcomp=comp here?  Will the user be confused
       # if he requests 10 comps and only 9 are returned?
-      # maxcomp <- comp
+      maxcomp <- comp
       anotherPC <- FALSE
     } else
       comp <- comp + 1
 
   } # Done finding PCs
 
-  # Un-cumulate R2
+  # un-cumulate R2
   R2 <- c(R2cum[1], diff(R2cum))
-
-  # This is a re-construction of x using maxcomp principal components
+  
+  # re-construction of x using maxcomp principal components
   fitted.values <- scores[ , 1:maxcomp] %*% t(loadings[ , 1:maxcomp])
   if(scale.) fitted.values <- fitted.values * attr(x, "scaled:scale")
   if(center) fitted.values <- fitted.values + attr(x, "scaled:center")
 
-  # Replace missing values in the original matrix with fitted values
+  # replace missing values in the original matrix with fitted values
   completeObs <- x.orig
   completeObs[is.na(x.orig)] <- fitted.values[is.na(x.orig)]
 
-  # Prepare output
+  # prepare output
   rownames(scores) <- rownames(x)
   colnames(scores) <- paste("PC", 1:ncol(scores), sep="")
   rownames(loadings) <- colnames(x)
   colnames(loadings) <- paste("PC", 1:ncol(loadings), sep="")
-  out <- list(x=scores, rotation=as.matrix(loadings),
+  out <- list(scores=scores, rotation=as.matrix(loadings),
               completeObs=completeObs,
               maxcomp=maxcomp,
               center=if(is.null(cen)) FALSE else cen,
               scale=if(is.null(sc)) FALSE else sc,
               sdev=apply(scores, 2, sd),
-              R2=R2, nr=nr, nc=nc,
+              R2=R2,
               eval=eval,
-              propvar=propvar,
-              n.missing=n.missing)
+              propvar=propvar)
   class(out) <- c("nipals","prcomp")
   return(out)
 }
+
