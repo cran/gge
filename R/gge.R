@@ -1,5 +1,12 @@
 # gge.R
-# Time-stamp: <12 May 2018 11:22:59 c:/x/rpack/gge/R/gge.R>
+# Time-stamp: <07 Jul 2020 17:32:34 c:/x/rpack/gge/R/gge.R>
+
+
+# Note: 
+# gge.formula and gge.data.frame are identical
+# gge.formula will be deprecated at some point
+
+
 
 #' GGE and GGB biplots
 #' 
@@ -55,10 +62,11 @@ RedGrayBlue <- colorRampPalette(c("firebrick", "lightgray", "#375997"))
 #' \item{genCoord}{genotype coordinates}
 #' \item{locCoord}{loc coordinates}
 #' \item{blockCoord}{block coordinates}
-#' \item{gen.group}{If not NULL, this specifies a
-#'   classification of genotypes into groups.}
-#' \item{env.group}{If not NULL, this specifies a classification of
-#'   environments into groups.}
+#' \item{gen.group}{If not NULL, use this to specify a column of the
+#'   data.frame to classify genotypes into groups.}
+#' \item{env.group}{If not NULL, use this to specify a column of the
+#'   data.frame to classify environments into groups.}
+#' \item{ggb}{If TRUE, create a GGB biplot}
 #' \item{genMeans}{genotype means}
 #' \item{mosdat}{mosaic plot data}
 #' \item{R2}{variation explained by eact PC}
@@ -76,7 +84,7 @@ RedGrayBlue <- colorRampPalette(c("firebrick", "lightgray", "#375997"))
 #' Jean-Louis Laffont, Kevin Wright and Mohamed Hanafi (2013).
 #' Genotype + Genotype x Block of Environments (GGB) Biplots.
 #' \emph{Crop Science}, 53, 2332-2341.
-#' \url{https://doi.org/10.2135/cropsci2013.03.0178}.
+#' \doi{10.2135/cropsci2013.03.0178}.
 #' 
 #' Kroonenberg, Pieter M. (1997).
 #' \emph{Introduction to Biplots for GxE Tables},
@@ -98,7 +106,8 @@ RedGrayBlue <- colorRampPalette(c("firebrick", "lightgray", "#375997"))
 #'               75, 95, 117, 133, 155), ncol=5, byrow=TRUE)
 #' rownames(B) <- c("G1","G2","G3","G4","G5","G6","G7")
 #' colnames(B) <- c("E1","E2","E3","E4","E5")
-#' 
+#'
+#' library(gge)
 #' m1 = gge(B)
 #' plot(m1)
 #' biplot(m1, main="Example biplot")
@@ -110,57 +119,63 @@ RedGrayBlue <- colorRampPalette(c("firebrick", "lightgray", "#375997"))
 #'   # Specify env.group as column in data frame
 #'   data(crossa.wheat)
 #'   dat2 <- crossa.wheat
-#'   dat2$eg <- ifelse(is.element(dat2$loc,
-#'                                c("KN","NB","PA","BJ","IL","TC", "JM","PI","AS","ID","SC","SS",
-#'                                  "SJ","MS","MG","MM")), "Grp1", "Grp2")
-#'   m2 <- gge(yield~gen*loc, dat2, env.group=eg, scale=FALSE)
+#'   m2 <- gge(yield~gen*loc, dat2, env.group=locgroup, scale=FALSE)
 #'   plot(m2)
 #'   biplot(m2, lab.env=TRUE, main="crossa.wheat")
 #'   # biplot3d(m2)
 #' }
 #' 
 #' @import reshape2
-#' @export gge
+#' 
+#' @export
 gge <- function(x, ...) UseMethod("gge")
 
 # ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
-#' @param formula A formula
-#' 
 #' @param data Data frame
+#' 
+#' @param formula A formula
 #' 
 #' @param gen.group genotype group
 #' 
 #' @param env.group env group
+#'
+#' @param ggb If TRUE, fit a GGB biplot model.
 #' 
 #' @rdname gge
 #' 
 #' @export
-gge.formula <- function(formula, data=NULL,
-                        gen.group=NULL, env.group=NULL, ...) {
+gge.data.frame <- function(x,
+                           formula,
+                           gen.group=NULL,
+                           env.group=NULL,
+                           ggb=FALSE,
+                           ...) {
   # Author: Kevin Wright
 
-  if(is.null(data))
+  data=x
+  if(missing(formula))
     stop("This usage of gge requires a formula AND data frame.")
 
   # previous subset/filter could leave extra levels behind
   data <- droplevels(data)
   
   # Get character representations of all necessary variables.
-  # There is probably a more R-like (obscure) way to do this, but this works.
+  # There is probably a more R-like (tidyeval?) way to do this. Oh well.
   vars <- all.vars(formula)
   # Check for valid names (in the data)
   if(!all(is.element(vars,names(data))))
     stop("Some of the terms in the formula are not found in the data.")
   .y <- vars[1]
-  .gen <- vars[2] # Note that 'gen' may already a variable in the data
+  .gen <- vars[2]
   .env <- vars[3]
 
   # Make gen.group & env.group either NULL or quoted name in the data
   gen.group <- substitute(gen.group)
   env.group <- substitute(env.group)
   if(!is.null(gen.group)) {
-    gen.group <- deparse(gen.group) # convert to text
+    gen.group <- deparse(gen.group) # convert gen.group to text
     if(!is.element(gen.group, names(data)))
       stop("The argument 'gen.group' refers to non-existant column of data.")
 
@@ -178,13 +193,14 @@ gge.formula <- function(formula, data=NULL,
       env.group <- NULL
     }
   }
-
+  if(is.null(env.group)) ggb <- FALSE
+  
   # Finally, reshape data into a matrix, average values in each cell
   datm <- reshape2::acast(data, formula(paste(.gen, "~", .env)),
                           fun.aggregate=mean, na.rm=TRUE, value.var=.y)
   datm[is.nan(datm)] <- NA # Use NA instead of NaN
 
-  # Make gen.group and env.group to be vectors for to rows/cols of datm
+  # Make gen.group and env.group to be vectors for the rows/cols of datm
   if(!is.null(gen.group)) {
     ix1 <- match(rownames(datm), data[[.gen]])
     gen.group <- data[[gen.group]][ix1]
@@ -195,7 +211,83 @@ gge.formula <- function(formula, data=NULL,
   }
 
   # Now call the matrix method and return the results
-  invisible(gge.matrix(datm, gen.group=gen.group, env.group=env.group, ...))
+  invisible(gge.matrix(datm, gen.group=gen.group, env.group=env.group, ggb=ggb, ...))
+}
+
+## gge.formula and gge.data.frame are identical
+## gge.formula will be deprecated
+
+#' @rdname gge
+#' 
+#' @export
+gge.formula <- function(formula,
+                        data,
+                        gen.group=NULL,
+                        env.group=NULL,
+                        ggb=FALSE,
+                        ...) {
+  # Author: Kevin Wright
+
+  # Message introduced Jun 2020.  Plan to deprecate end of 2021.
+  message("Please use `gge(data,formula)` instead of `gge(formula,data)`\n")
+  
+  if(is.null(data))
+    stop("This usage of gge requires a formula AND data frame.")
+
+  # previous subset/filter could leave extra levels behind
+  data <- droplevels(data)
+  
+  # Get character representations of all necessary variables.
+  # There is probably a more R-like (tidyeval?) way to do this. Oh well.
+  vars <- all.vars(formula)
+  # Check for valid names (in the data)
+  if(!all(is.element(vars,names(data))))
+    stop("Some of the terms in the formula are not found in the data.")
+  .y <- vars[1]
+  .gen <- vars[2]
+  .env <- vars[3]
+
+  # Make gen.group & env.group either NULL or quoted name in the data
+  gen.group <- substitute(gen.group)
+  env.group <- substitute(env.group)
+  if(!is.null(gen.group)) {
+    gen.group <- deparse(gen.group) # convert gen.group to text
+    if(!is.element(gen.group, names(data)))
+      stop("The argument 'gen.group' refers to non-existant column of data.")
+
+    if(any(colSums(table(data[[gen.group]], data[[.gen]])>0)>1)){
+      stop("Some values of '", .gen, "' have multiple gen.group.")
+    }
+  }
+  if(!is.null(env.group)) {
+    env.group <- deparse(env.group)
+    if(!is.element(env.group, names(data)))
+      stop("The argument 'env.group' refers to non-existant column of data.")
+
+    if(any(colSums(table(data[[env.group]], data[[.env]])>0)>1)){
+      stop("Some values of '", .env, "' have multiple env.group.")
+      env.group <- NULL
+    }
+  }
+  if(is.null(env.group)) ggb <- FALSE
+  
+  # Finally, reshape data into a matrix, average values in each cell
+  datm <- reshape2::acast(data, formula(paste(.gen, "~", .env)),
+                          fun.aggregate=mean, na.rm=TRUE, value.var=.y)
+  datm[is.nan(datm)] <- NA # Use NA instead of NaN
+
+  # Make gen.group and env.group to be vectors for the rows/cols of datm
+  if(!is.null(gen.group)) {
+    ix1 <- match(rownames(datm), data[[.gen]])
+    gen.group <- data[[gen.group]][ix1]
+  }
+  if(!is.null(env.group)) {
+    ix2 <- match(colnames(datm), data[[.env]])
+    env.group <- data[[env.group]][ix2]
+  }
+
+  # Now call the matrix method and return the results
+  invisible(gge.matrix(datm, gen.group=gen.group, env.group=env.group, ggb=ggb, ...))
 }
 
 # ----------------------------------------------------------------------------
@@ -204,15 +296,19 @@ gge.formula <- function(formula, data=NULL,
 #' 
 #' @param scale If TRUE, scale values for each environment
 #' 
-#' @param method method used to find principal component directions
+#' @param method method used to find principal component directions. Either
+#' "svd" or "nipals".
 #' 
 #' @rdname gge
 #' 
 #' @importFrom nipals nipals
 #' 
 #' @export
-gge.matrix <- function(x, center=TRUE, scale=TRUE,
-                       gen.group=NULL, env.group = NULL,
+gge.matrix <- function(x,
+                       center=TRUE, scale=TRUE,
+                       gen.group=NULL,
+                       env.group = NULL,
+                       ggb=FALSE,
                        comps=c(1,2), method="svd", ...) {
 
   # x: matrix of rows=genotypes, cols=environments
@@ -242,7 +338,7 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
   if(any(genPct<.2) || any(envPct<.2))
     warning("Missing data may be structured.")
 
-  # Maximum number of PCs. Because of column-centering row rank is reduced by 1
+  # Maximum number of PCs. Because of column-centering, row rank is reduced by 1
   maxPCs <- min(nrow(x)-1, ncol(x))
 
   if(!is.element(method, c('svd', 'nipals')))
@@ -283,9 +379,7 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
   x.cc <- x - x.g # x.cc = x.orig - envmeans - genmeans
   x.grp <- NULL
 
-  if(is.null(env.group)){
-    x.gb <- x.cc # No groups (each loc is its own group)
-  } else {
+  if(ggb & !is.null(env.group)){
     groupNames <- names(table(env.group))
     for(i in groupNames) {
       # Need 'drop' so that a single-column is not converted to vector
@@ -294,7 +388,10 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
     }
     colnames(x.grp) <- groupNames
     x.gb <- x.grp[,match(env.group, colnames(x.grp))]
+  } else {
+    x.gb <- x.cc # No groups (each loc is its own group)
   }
+
   # x.r is a matrix of residuals = x.orig - colmeans - rowmeans - G*B
   x.r <- x - x.g - x.gb
 
@@ -327,12 +424,12 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
   U <- U[ , 1:maxcomp]
   D <- D[1:maxcomp]
   n.gen <- nrow(x)
-  
+
   focus <- "env" # fixme: add options other focus methods
-  
+
   # other biplot programs use 'v' matrix in calculating coordinates
-  # but we create block coordinates, and then rotate into position
-  #browser()
+  # but we create block coordinates, and then use U to rotate into position
+  # browser()
   # commented code below comes from bpca
   # https://github.com/cran/bpca/blob/master/R/bpca.default.R
   if(focus=="env"){
@@ -344,15 +441,19 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
   }
 
   locCoord <- blockCoord + resCoord
-  
+
   # completeObs matrix lacks rownames ?
   rownames(genCoord) <- rownames(x.orig)
   rownames(locCoord) <- colnames(x.orig)
   rownames(blockCoord) <- env.group
+  # nipals results have column names, but svd does not, so tidy up
+  colnames(genCoord) <- paste0("PC", 1:maxcomp)
+  colnames(locCoord) <- paste0("PC", 1:maxcomp)
+  colnames(blockCoord) <- paste0("PC", 1:maxcomp)
 
   ret <- list(x=x, x.orig=x.orig,
               genCoord=genCoord, locCoord=locCoord, blockCoord=blockCoord,
-              gen.group=gen.group, env.group=env.group,
+              gen.group=gen.group, env.group=env.group, ggb=ggb,
               genMeans=genMeans, mosdat=mosdat, R2=R2,
               center=center, scale=scale, method=method,
               pctMiss=pctMiss, maxPCs=maxPCs)
@@ -361,27 +462,34 @@ gge.matrix <- function(x, center=TRUE, scale=TRUE,
   return(ret)
 }
 
-expand.range <- function(xx) { 
-  # make sure the range includes origin
+expand.range <- function(xx) {
+  # make sure the range of xx includes 0
+  # xx is an object coming from range(), so xx[1] < xx[2]
+  # expand.range(c(-2,-1)) = -2, 1
+  # expand.range(c(-2,2))  = -2  2
+  # expand.range(c(1,2))   = -1  2
+
   if(xx[1] > 0) xx[1] <-  - xx[1]
   else if(xx[2] < 0) xx[2] <-  - xx[2]
   return(xx)
 }
 
 extend <- function(x,y,xlim,ylim){
-  # extend vectors(0,0,x,y) to the edge of the box defined by (xlim,ylim)
-  # This box has four 'quadrants' bottom,right,top,left.
-  # The 'right' quadrant is a triangle bounded by:
+  # Extend the line (0,0)-(x,y) to the edge of the box defined by (xlim,ylim)
+  # This box has four 'quadrants' bottom,right,top,left. For example, 
+  # the 'right' quadrant is a triangle bounded by the points:
   # (0, bottom-right corner, top-right corner)
 
-  xmin <- xlim[1]; xmax <- xlim[2]
-  ymin <- ylim[1]; ymax <- ylim[2]
+  xmin <- xlim[1]
+  xmax <- xlim[2]
+  ymin <- ylim[1]
+  ymax <- ylim[2]
 
-  tr <- atan2(ymax, xmax) # Angle to top-right corner
+  tr <- atan2(ymax, xmax) # Angle of line from 0 to top-right corner
   tl <- atan2(ymax, xmin) #   top-left
   bl <- atan2(ymin, xmin) #   bottom-left
   br <- atan2(ymin, xmax) #   bottom-right
-  phi <- atan2(y, x)      # Angle to each point
+  phi <- atan2(y, x)      # Angle of line to each point
 
   # Instead of many "if-else" terms, just sum(quadrant_indicator * ordinate)
   x2 <- (bl < phi & phi <= br) * (ymin*x/y) + # bottom edge
@@ -407,8 +515,8 @@ plot.gge <- function(x, main=substitute(x), ...) {
   # title deprecated in gge 1.2, 2017
   args <- match.call()
   if( is.element("title", names(args)) ) {
-    main <- args$title
-    cat("Argument 'title' will be deprecated. Use 'main' instead.\n")
+    #main <- args$title
+    stop("Argument 'title' is deprecated. Use 'main' instead.\n")
   }
   
   op1 <- par(mfrow=c(2,2), pty="s", mar=c(3,5,2,1))
@@ -452,11 +560,13 @@ plot.gge <- function(x, main=substitute(x), ...) {
 #' 
 #' @param cex.gen Character expansion for genotypes, default 0.6. Use 0 to omit genotypes.
 #' 
-#' @param cex.env Character expansion for environments
+#' @param cex.env Character expansion for environment labels.
 #' 
-#' @param col.gen Color for genotypes
+#' @param col.gen Color for genotype labels.  May be a single color for all genotypes,
+#' or a vector of colors for each genotype.
 #' 
-#' @param col.env Color for environments
+#' @param col.env Color for environments. May be a single color for all environments,
+#' or a vector of colors for each environment.
 #' 
 #' @param pch.gen Plot character for genotypes
 #' 
@@ -514,6 +624,7 @@ biplot.gge <- function(x, main = substitute(x), subtitle="",
 
   gen.group <- x$gen.group
   env.group <- x$env.group
+  ggb <- x$ggb
   genCoord <- x$genCoord
   locCoord <- x$locCoord
   blockCoord <- x$blockCoord
@@ -609,12 +720,12 @@ biplot.gge <- function(x, main = substitute(x), subtitle="",
   re2 <- expand.range(range(locCoord[, ycomp]))
   ratio <- max(c(re1, re2)/c(xlimg, ylimg)) * 1.1 # 1.1 adds extra space
   
-  # lastly, manual zooming of environment window
+  # lastly, manual override zooming of environment window
   xlime <- xlimg * ratio / zoom.env
   ylime <- ylimg * ratio / zoom.env
 
   # use 'ratio' to scale genotype coordinates to fill environment window
-  # manual adjustment is done with zoom.gen
+  # manual override zooming
   genCoord <-  genCoord * ratio / zoom.gen
   
   # set up plot for environment vectors
@@ -646,7 +757,9 @@ biplot.gge <- function(x, main = substitute(x), subtitle="",
   # plot locs first (points OR labels, but not both) colored by group
   if(is.null(env.group)) {
     eix <- rep(1, nrow(locCoord))
-  } else eix <- as.numeric(factor(env.group))
+  } else {
+    eix <- as.numeric(factor(env.group))
+  }
 
   if(lab.env == TRUE) {
     text(locCoord[ , c(xcomp, ycomp), drop = FALSE],
@@ -656,38 +769,44 @@ biplot.gge <- function(x, main = substitute(x), subtitle="",
            cex = cex.env, col = col.env[eix]) # pch = (1:n.env.grp)[eix])
   }
 
-  # No groups. Draw vector to each loc, shorten to reduce over-plotting
+  # No env groups. Draw vector to each loc, shorten to reduce over-plotting
   if(n.env.grp == 0){
-    segments(0, 0, .95*locCoord[,xcomp], .95*locCoord[,ycomp], col = col.env[1])
+    segments(0, 0, .95*locCoord[,xcomp], .95*locCoord[,ycomp],
+             col = col.env[1])
   }
-  
-  # One or more groups. Draw solid/dashed group vector
-  if(n.env.grp >= 1) {
+
+  # One or more groups. NOT GGB. Draw vector to each loc, colored by group.
+  if(n.env.grp >= 1 & !ggb){
+    segments(0, 0, .95*locCoord[,xcomp], .95*locCoord[,ycomp],
+             col = col.env[eix])
+  }
+  # One or more groups. IS GGB.
+  if(n.env.grp >= 1 & ggb) {
     # Draw solid-line part of the group vector
-    ubc <- blockCoord[groupNames,,drop=FALSE] # Get unique row for each group
-    segments(0, 0, ubc[ , xcomp], ubc[ , ycomp], 
+    unibc <- blockCoord[groupNames,,drop=FALSE] # Get unique row for each group
+    segments(0, 0, unibc[ , xcomp], unibc[ , ycomp], 
              lwd = 2, col=col.env) # no 'eix'
     # End point
-    # points(ubc[ , c(xcomp,ycomp)], pch = 16, col=col.env) # no 'eix'
+    # points(unibc[ , c(xcomp,ycomp)], pch = 16, col=col.env) # no 'eix'
     # The 'xy' variable extends the vector to the edge of plot
-    xy <- extend(ubc[ , xcomp], ubc[ , ycomp], xlime, ylime)
+    xy <- extend(unibc[ , xcomp], unibc[ , ycomp], xlime, ylime)
     # Now the extended dashed-line part of the group vector.  Shorten by 10%
     # to reduce over-plotting.
-    segments(ubc[ , xcomp], ubc[ , ycomp],
+    segments(unibc[ , xcomp], unibc[ , ycomp],
              .90*xy$x2, .90*xy$y2, lty = 3, col=col.env)
     # Add group label
-    text(.95*xy$x2, .95*xy$y2, rownames(ubc), cex = 1, col=col.env)
+    text(.95*xy$x2, .95*xy$y2, rownames(unibc), cex = 1, col=col.env)
   }
   
   # One group. Add dashed line group vector in opposite direction for AEC
   if(n.env.grp == 1){
-    ubc <- -1 * ubc 
-    xy <- extend( ubc[ , xcomp], ubc[ , ycomp], xlime, ylime)
+    unibc <- -1 * unibc 
+    xy <- extend( unibc[ , xcomp], unibc[ , ycomp], xlime, ylime)
     segments(0, 0, .90*xy$x2, .90*xy$y2, lty = 3, col=col.env)
   }
   
-  # Two or more groups. Draw residual vector from group mean to each loc
-  if((n.env.grp >=  2) & res.vec) {
+  # GGB with two or more groups. Draw residual vector from group mean to each loc
+  if(ggb & n.env.grp >=  2 & res.vec) {
     segments(blockCoord[ , xcomp], blockCoord[ , ycomp],
              locCoord[ , xcomp], locCoord[ , ycomp],
              col = col.env[eix], lwd = .5)
@@ -746,8 +865,8 @@ biplot.gge <- function(x, main = substitute(x), subtitle="",
         xnew <- x11
       } else {
         m1 <- (y22-y11) / (x22-x11)        # Slope of polygon line
-        m2 <- -1/m1                        # Slope of perp line
-        xnew <- (m1 * x11 - y11) / (m1-m2) # Point on polygon line   
+        m2 <- -1/m1                        # Slope of perpendicular line
+        xnew <- (m1 * x11 - y11) / (m1-m2) # Point of intersection of the two lines
       }
       ynew <- m2 * xnew
       # Draw to edge of genotype box
@@ -814,7 +933,7 @@ biplot3d.gge <- function(x,
 
   # Axis labels
   labs <- paste("PC ", c(xcomp, ycomp, zcomp),
-                  " (", round(100*R2[c(xcomp,ycomp)],0), "% TSS)", sep="")
+                  " (", round(100*R2[c(xcomp,ycomp,zcomp)],0), "% TSS)", sep="")
   xlab <- labs[1]
   ylab <- labs[2]
   zlab <- labs[3]

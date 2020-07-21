@@ -4,8 +4,7 @@
 \name{gge}
 \alias{gge}
 \alias{package-gge}
-\alias{gge-package}
-\alias{gge}
+\alias{gge.data.frame}
 \alias{gge.formula}
 \alias{gge.matrix}
 \alias{plot.gge}
@@ -16,25 +15,60 @@
 \usage{
 gge(x, ...)
 
-\method{gge}{formula}(formula, data = NULL, gen.group = NULL,
-  env.group = NULL, ...)
+\method{gge}{data.frame}(x, formula, gen.group = NULL, env.group = NULL, ggb = FALSE, ...)
 
-\method{gge}{matrix}(x, center = TRUE, scale = TRUE, gen.group = NULL,
-  env.group = NULL, comps = c(1, 2), method = "svd", ...)
+\method{gge}{formula}(formula, data, gen.group = NULL, env.group = NULL, ggb = FALSE, ...)
+
+\method{gge}{matrix}(
+  x,
+  center = TRUE,
+  scale = TRUE,
+  gen.group = NULL,
+  env.group = NULL,
+  ggb = FALSE,
+  comps = c(1, 2),
+  method = "svd",
+  ...
+)
 
 \method{plot}{gge}(x, main = substitute(x), ...)
 
-\method{biplot}{gge}(x, main = substitute(x), subtitle = "",
-  xlab = "auto", ylab = "auto", cex.gen = 0.6, cex.env = 0.5,
-  col.gen = "darkgreen", col.env = "orange3", pch.gen = 1,
-  lab.env = TRUE, comps = 1:2, flip = "auto", origin = "auto",
-  res.vec = TRUE, hull = FALSE, zoom.gen = 1, zoom.env = 1, ...)
+\method{biplot}{gge}(
+  x,
+  main = substitute(x),
+  subtitle = "",
+  xlab = "auto",
+  ylab = "auto",
+  cex.gen = 0.6,
+  cex.env = 0.5,
+  col.gen = "darkgreen",
+  col.env = "orange3",
+  pch.gen = 1,
+  lab.env = TRUE,
+  comps = 1:2,
+  flip = "auto",
+  origin = "auto",
+  res.vec = TRUE,
+  hull = FALSE,
+  zoom.gen = 1,
+  zoom.env = 1,
+  ...
+)
 
 biplot3d(x, ...)
 
-\method{biplot3d}{gge}(x, cex.gen = 0.6, cex.env = 0.5,
-  col.gen = "darkgreen", col.env = "orange3", comps = 1:3,
-  lab.env = TRUE, res.vec = TRUE, zoom.gen = 1, ...)
+\method{biplot3d}{gge}(
+  x,
+  cex.gen = 0.6,
+  cex.env = 0.5,
+  col.gen = "darkgreen",
+  col.env = "orange3",
+  comps = 1:3,
+  lab.env = TRUE,
+  res.vec = TRUE,
+  zoom.gen = 1,
+  ...
+)
 }
 \arguments{
 \item{x}{A matrix or data.frame.}
@@ -43,11 +77,13 @@ biplot3d(x, ...)
 
 \item{formula}{A formula}
 
-\item{data}{Data frame}
-
 \item{gen.group}{genotype group}
 
 \item{env.group}{env group}
+
+\item{ggb}{If TRUE, fit a GGB biplot model.}
+
+\item{data}{Data frame}
 
 \item{center}{If TRUE, center values for each environment}
 
@@ -55,7 +91,8 @@ biplot3d(x, ...)
 
 \item{comps}{Principal components to use for the biplot. Default c(1,2).}
 
-\item{method}{method used to find principal component directions}
+\item{method}{method used to find principal component directions. Either
+"svd" or "nipals".}
 
 \item{main}{Title, by default the name of the data. Use NULL to suppress the title.}
 
@@ -67,11 +104,13 @@ biplot3d(x, ...)
 
 \item{cex.gen}{Character expansion for genotypes, default 0.6. Use 0 to omit genotypes.}
 
-\item{cex.env}{Character expansion for environments}
+\item{cex.env}{Character expansion for environment labels.}
 
-\item{col.gen}{Color for genotypes}
+\item{col.gen}{Color for genotype labels.  May be a single color for all genotypes,
+or a vector of colors for each genotype.}
 
-\item{col.env}{Color for environments}
+\item{col.env}{Color for environments. May be a single color for all environments,
+or a vector of colors for each environment.}
 
 \item{pch.gen}{Plot character for genotypes}
 
@@ -103,10 +142,11 @@ A list of class \code{gge} containing:
 \item{genCoord}{genotype coordinates}
 \item{locCoord}{loc coordinates}
 \item{blockCoord}{block coordinates}
-\item{gen.group}{If not NULL, this specifies a
-  classification of genotypes into groups.}
-\item{env.group}{If not NULL, this specifies a classification of
-  environments into groups.}
+\item{gen.group}{If not NULL, use this to specify a column of the
+  data.frame to classify genotypes into groups.}
+\item{env.group}{If not NULL, use this to specify a column of the
+  data.frame to classify environments into groups.}
+\item{ggb}{If TRUE, create a GGB biplot}
 \item{genMeans}{genotype means}
 \item{mosdat}{mosaic plot data}
 \item{R2}{variation explained by eact PC}
@@ -117,8 +157,6 @@ A list of class \code{gge} containing:
 \item{maxPCs}{Maximum number of PCs}
 }
 \description{
-GGE and GGB biplots
-
 Fit a GGE (genotype + genotype * environment) model and display the results.
 }
 \details{
@@ -143,6 +181,7 @@ B <- matrix(c(50, 67, 90, 98, 120,
 rownames(B) <- c("G1","G2","G3","G4","G5","G6","G7")
 colnames(B) <- c("E1","E2","E3","E4","E5")
 
+library(gge)
 m1 = gge(B)
 plot(m1)
 biplot(m1, main="Example biplot")
@@ -154,10 +193,7 @@ if(require(agridat)){
   # Specify env.group as column in data frame
   data(crossa.wheat)
   dat2 <- crossa.wheat
-  dat2$eg <- ifelse(is.element(dat2$loc,
-                               c("KN","NB","PA","BJ","IL","TC", "JM","PI","AS","ID","SC","SS",
-                                 "SJ","MS","MG","MM")), "Grp1", "Grp2")
-  m2 <- gge(yield~gen*loc, dat2, env.group=eg, scale=FALSE)
+  m2 <- gge(yield~gen*loc, dat2, env.group=locgroup, scale=FALSE)
   plot(m2)
   biplot(m2, lab.env=TRUE, main="crossa.wheat")
   # biplot3d(m2)
@@ -168,7 +204,7 @@ if(require(agridat)){
 Jean-Louis Laffont, Kevin Wright and Mohamed Hanafi (2013).
 Genotype + Genotype x Block of Environments (GGB) Biplots.
 \emph{Crop Science}, 53, 2332-2341.
-\url{https://doi.org/10.2135/cropsci2013.03.0178}.
+\doi{10.2135/cropsci2013.03.0178}.
 
 Kroonenberg, Pieter M. (1997).
 \emph{Introduction to Biplots for GxE Tables},

@@ -9,12 +9,12 @@ data(yan.winterwheat)
 dat1 <- yan.winterwheat
 
 library(gge)
-m1 <- gge(yield~gen*env, dat1, scale=FALSE)
+m1 <- gge(dat1, yield~gen*env, scale=FALSE)
 biplot(m1, main="yan.winterwheat - GGE biplot",
        flip=c(1,0), origin=0, hull=TRUE)
 
 ## ---------------------------------------------------------------------------------------
-m2 <- gge(yield~gen*env, dat1, scale=TRUE)
+m2 <- gge(dat1, yield~gen*env, scale=TRUE)
 biplot(m2, main="yan.winterwheat - GGE biplot",
        flip=c(1,1), origin=0)
 
@@ -23,7 +23,7 @@ biplot(m2, main="yan.winterwheat - GGE biplot - PC 2 & 3",
        comps=c(2,3), flip=c(1,1), origin=0)
 
 ## ----mosaic-----------------------------------------------------------------------------
-plot(m1, title="yan.winterwheat")
+plot(m1, main="yan.winterwheat")
 
 ## ----ggb--------------------------------------------------------------------------------
 library(agridat)
@@ -38,8 +38,8 @@ dat2$eg <- ifelse(is.element(dat2$loc,
 
 library(gge)
 # Specify env.group as column in data frame
-m3 <- gge(yield~gen*loc, dat2, env.group=eg, scale=FALSE)
-biplot(m3, title="crossa.wheat - GGB biplot")
+m3 <- gge(dat2, yield~gen*loc, env.group=eg, scale=FALSE)
+biplot(m3, main="crossa.wheat - GGB biplot")
 
 
 ## ---- eval=0----------------------------------------------------------------------------
@@ -61,7 +61,4 @@ sv <- sqrt(Xc.pca$eig)
 ## ---- eval=0----------------------------------------------------------------------------
 (v %*% s)[,1:2]
 (p %*% diag(sv))[,1:2]
-
-## ----session----------------------------------------------------------------------------
-sessionInfo()
 
