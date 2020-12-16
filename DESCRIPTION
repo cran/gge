@@ -1,7 +1,7 @@
 Package: gge
 Title: Genotype Plus Genotype-by-Environment Biplots
-Version: 1.5
-Date: 2020-07-20
+Version: 1.6
+Date: 2020-12-15
 Authors@R: c(
   person("Kevin","Wright", email="kw.stat@gmail.com", 
   comment=c(ORCID = "0000-0002-0617-8673"), role=c("aut","cre")),
@@ -11,8 +11,8 @@ Description: Create biplots for GGE (genotype plus genotype-by-environment) and
     GGB (genotype plus genotype-by-block-of-environments) models. 
     See Laffont et al. (2013) <doi:10.2135/cropsci2013.03.0178>.
 Type: Package
-Imports: nipals, rgl, reshape2
-Suggests: agridat, knitr, lattice, rmarkdown, testthat
+Imports: nipals, reshape2
+Suggests: agridat, knitr, lattice, rgl, rmarkdown, testthat
 License: GPL-3
 LazyData: yes
 URL: http://kwstat.github.io/gge/
@@ -21,9 +21,9 @@ VignetteBuilder: knitr
 RoxygenNote: 7.1.1
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2020-07-20 17:03:38 UTC; wrightkevi
+Packaged: 2020-12-16 15:01:48 UTC; wrightkevi
 Author: Kevin Wright [aut, cre] (<https://orcid.org/0000-0002-0617-8673>),
   Jean-Louis Laffont [aut]
 Maintainer: Kevin Wright <kw.stat@gmail.com>
 Repository: CRAN
-Date/Publication: 2020-07-21 06:30:10 UTC
+Date/Publication: 2020-12-16 16:10:14 UTC
