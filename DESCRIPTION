@@ -1,7 +1,6 @@
 Package: gge
 Title: Genotype Plus Genotype-by-Environment Biplots
-Version: 1.6
-Date: 2020-12-15
+Version: 1.7
 Authors@R: c(
   person("Kevin","Wright", email="kw.stat@gmail.com", 
   comment=c(ORCID = "0000-0002-0617-8673"), role=c("aut","cre")),
@@ -14,16 +13,15 @@ Type: Package
 Imports: nipals, reshape2
 Suggests: agridat, knitr, lattice, rgl, rmarkdown, testthat
 License: GPL-3
-LazyData: yes
-URL: http://kwstat.github.io/gge/
+URL: https://kwstat.github.io/gge/
 BugReports: https://github.com/kwstat/gge/issues
 VignetteBuilder: knitr
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2020-12-16 15:01:48 UTC; wrightkevi
+Packaged: 2021-10-31 14:24:28 UTC; wrightkevi
 Author: Kevin Wright [aut, cre] (<https://orcid.org/0000-0002-0617-8673>),
   Jean-Louis Laffont [aut]
 Maintainer: Kevin Wright <kw.stat@gmail.com>
 Repository: CRAN
-Date/Publication: 2020-12-16 16:10:14 UTC
+Date/Publication: 2021-10-31 21:20:02 UTC
